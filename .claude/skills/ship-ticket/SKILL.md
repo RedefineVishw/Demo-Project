@@ -1,126 +1,129 @@
 ---
 name: ship-ticket
-description: Use when the user pastes a block of raw ticket/task description text (e.g. copied from Wrike — has a title and description of work to do) and asks to implement it, or when the user explicitly says "ship this ticket". Drives the full flow from reading the ticket through implementation, diff review, Jam-based verification, gated commit, and a copy-paste Wrike-ready summary.
+description: Use when the user pastes a block of raw ticket/task description text (e.g. copied from Wrike — has a title and description of work to do) and asks to implement it, or when the user explicitly says "ship this ticket". Drives the full flow from reading the ticket through implementation, one diff-review gate, auto-commit on approval, then automated post-commit browser verification and an auto-published artifact summary.
 ---
 
 # Ship Ticket
 
-Drive a pasted ticket from raw text to a verified, committed change and a
-copy-paste summary — one step at a time, pausing for human input at the
-points marked below. Do not skip steps or collapse them into one shot; the
-pauses are load-bearing.
+Four steps. Exactly one human checkpoint (Step 3). Everything else — context
+gathering, implementation, staging, committing, browser verification, and
+the final summary artifact — runs automatically once that checkpoint is
+cleared.
 
-Never fetch from a ticket system and never fabricate a Jam link or claim
-verification happened without one. If any step fails or is genuinely
-uncertain, stop and say so instead of guessing.
+Never fabricate a video, a Jam link, or a "verified" claim without real
+evidence behind it. If something can't be captured automatically (see the
+Jam note in Step 4), say so plainly in the output instead of pretending it
+happened.
 
-## Step 1 — Parse the ticket
+## Step 1 — Ingest the ticket
 
-The user pastes raw ticket text (title + description). From it extract:
+The user pastes raw ticket text (title + description). Read it and hold it
+as the spec for what follows. No API/ticket-system fetching — paste-only.
 
-- **What needs to change** — the concrete behavior/output being asked for.
-- **Where it likely lives** — which page/component/module in this app, based
-  on names, terminology, or areas mentioned in the ticket.
-- **Ambiguities** — anything not fully specified (see Step 3).
+## Step 2 — Implement, following the project's own rules
 
-Restate this back briefly (a few lines) before moving on, so the user can
-correct a misread before any code gets touched.
+Do this without asking the user to walk you through it:
 
-## Step 2 — Gather context before writing any code
+1. Read `CLAUDE.md` at the repo root (or the closest equivalent —
+   `CONTRIBUTING.md`, `RULEBOOK.md`, `README.md` — if `CLAUDE.md` doesn't
+   exist) for conventions, structure, and any stated rules.
+2. Identify which part of the app the ticket touches, and run `git log` /
+   `git blame` on those files/modules to see how similar changes were made
+   recently — naming, structure, test/keyword patterns. Follow an existing
+   pattern rather than inventing a new one if one clearly applies.
+3. If — and only if — something that changes user-facing behavior is
+   genuinely ambiguous (which page/component, what the expected behavior
+   is, multiple valid approaches), ask one short, specific question before
+   writing code. Don't stall on things you can reasonably infer from the
+   ticket and the codebase.
+4. Implement the change, keeping the diff as small and targeted as the
+   ticket allows.
 
-- Read `CLAUDE.md` at the repo root for coding conventions. If it doesn't
-  exist, say so, and fall back to whatever conventions doc the repo has
-  (e.g. `CONTRIBUTING.md`, `RULEBOOK.md`, `README.md`) if one is present.
-- Run `git log` and `git blame` on the files/modules the ticket likely
-  touches (identified in Step 1) to see how similar changes were made
-  recently, and match that style — naming, structure, test patterns, etc.
-- If you find an existing commit or PR that solved something similar in this
-  codebase, follow its pattern rather than inventing a new one.
+## Step 3 — Review gate (the one human checkpoint)
 
-## Step 3 — Ask before assuming
+Show:
 
-If, after Steps 1–2, any of the following are still unclear, **stop and ask
-one specific, short question** before writing any code:
+- The full diff (`git diff`).
+- A one-line explanation of what changed and why.
 
-- Which page/component the change belongs in (if more than one is plausible).
-- What the expected behavior actually is.
-- There are multiple valid implementation approaches with different
-  user-facing tradeoffs.
+Then ask, with exactly two paths (use AskUserQuestion):
 
-Do not silently guess on anything that changes user-facing behavior. If
-everything is unambiguous, say so explicitly and proceed.
+- **Yes, ship it** — proceed immediately to commit (below) and then Step 4.
+  No second confirmation before committing — this "yes" is the approval
+  for both the diff and the commit.
+- **Needs changes** — capture what the user wants adjusted, apply it, and
+  show the diff again. Loop this step until they pick "yes" (or tell you
+  to stop).
 
-## Step 4 — Implement the change
+On "yes":
 
-Write the code following the conventions found in Step 2. Keep the diff as
-small and targeted as reasonably possible — don't refactor unrelated code or
-widen scope beyond what the ticket asks for.
+1. `git add` only the files that were actually changed for this ticket.
+2. Draft a commit message matching this repo's existing style — check
+   recent `git log` for tense, length, and whether prefixes/ticket IDs are
+   used. Don't invent a conventional-commits format the repo doesn't use.
+3. Commit.
 
-## Step 5 — Show the diff and pause
+## Step 4 — Automated verification and artifact
 
-Show the full diff (`git diff`) plus a one-line explanation of what changed
-and why.
+Hand this whole step to the `verify-and-summarize` subagent (via the Agent
+tool), so the browser noise, screenshots, and logs stay out of this
+conversation. Give it:
 
-**Stop here. Do not proceed to Step 6 until the user responds** — they may
-want changes to the implementation itself.
+- The ticket text.
+- What was implemented (short description + files changed).
+- The commit hash just created.
+- Whether video is required (see below).
 
-## Step 6 — Verification via Jam
+**Before invoking it**, determine and ask about video:
 
-Ask the user to:
+1. Auto-classify the change as **static** (copy/text/style/label changes
+   with no behavioral or flow difference) or **flow-changing** (forms,
+   checkout, multi-step interactions, anything where a user's path through
+   the app is different than before).
+2. Regardless of that classification, explicitly ask the user with a
+   yes/no question — "Is a video walkthrough required for this
+   verification?" — showing your recommendation (yes for flow-changing,
+   no for static) but letting them override it either way. Don't skip this
+   ask even when the answer seems obvious.
 
-1. Manually test the change in the browser.
-2. Record a Jam (open the Jam extension, walk through the change, stop
-   recording).
-3. Paste the resulting Jam link back into the chat.
+**No Jam MCP server is connected in this environment.** The subagent
+should still attempt an automated, non-manual verification via the
+Playwright MCP browser tools (navigate, interact, screenshot, capture
+console/network) regardless of the video answer — that's not optional and
+doesn't require Jam. Video specifically is the part that depends on Jam:
 
-Do not proceed past this point without a real, user-provided Jam link. Do
-not fabricate one and do not claim verification happened without one.
+- If video was requested and a Jam MCP connector happens to be available,
+  use it to actually record.
+- If video was requested and no Jam MCP connector is available, do not
+  fabricate one. Fall back to a step-by-step screenshot storyboard from
+  the Playwright walkthrough as the visual evidence, and say plainly in
+  the artifact that a real video wasn't captured (no Jam connector) —
+  offer that the user can record one manually and share it if they want
+  the video specifically.
+- If video was not requested, the screenshot storyboard + console/network
+  evidence from the Playwright walkthrough is sufficient on its own.
 
-Once the user pastes the Jam link, hand off to the `verify-and-summarize`
-subagent (via the Agent tool) rather than pulling Jam data into this
-context directly — give it:
+The subagent should:
 
-- The Jam link.
-- A short description of what Step 4 was supposed to implement (so it can
-  cross-check).
-- The list of files changed.
+1. Drive the relevant flow in a real browser via Playwright MCP tools,
+   covering what the ticket asked for.
+2. Capture screenshots, console errors, and failed network requests.
+3. Diff the current commit against the previous commit / last merged
+   state (`git log`, `git diff HEAD~1..HEAD --stat`, etc.) to describe
+   what changed relative to what shipped before.
+4. Cross-check: does the browser evidence actually match what Step 2
+   implemented? Flag anything that doesn't (console errors, failed
+   requests, missing behavior) instead of assuming success.
+5. Publish a single Artifact containing: technical summary (files changed,
+   what was implemented, edge cases/tradeoffs), the previous-vs-current
+   comparison, embedded screenshots, the video/storyboard section, and a
+   manager-friendly plain-English summary (2-4 sentences, no jargon).
+6. Return to this conversation only: pass/fail verdict, the artifact link,
+   and a short plain-text mirror of the technical + manager summaries
+   (so the user can paste that directly into a Wrike comment without
+   opening the artifact).
 
-The subagent will report back whether the recording matches expectations or
-flags a mismatch. If it flags a mismatch (console errors, failed network
-calls, behavior that doesn't match the implementation), **report that to the
-user and stop — do not proceed to Step 7.**
-
-## Step 7 — Stage and commit, only with explicit approval
-
-Once verification passes:
-
-1. Run `git add` on the changed files (only those files).
-2. Draft a commit message following this repo's existing commit message
-   style — check recent `git log` output for the pattern (tense, length,
-   prefixes/tags, whether it references a ticket ID) and match it rather
-   than assuming a style.
-3. Show the staged files and the drafted commit message.
-4. **Only run `git commit` after the user explicitly replies "yes" or
-   "commit."** Never commit automatically, and never combine this with
-   Step 5's or Step 6's pause.
-
-## Step 8 — Generate the copy-paste output
-
-Produce a single block of plain text/markdown, ready to paste directly into
-a Wrike comment with no editing needed, with two clearly separated sections:
-
-**Technical summary** — files changed, what was implemented, any edge cases
-or tradeoffs, written for another developer or for a PR description.
-
-**Manager-friendly summary** — 2-4 plain-English sentences describing what
-changed and why it matters, no jargon, written for a non-technical reader of
-the Wrike ticket.
-
-Include the Jam link under both sections.
-
-## Dry-run mode
-
-If the user asks to test/dry-run this skill, walk through Steps 1–8 live
-against a ticket they paste, pausing at Steps 3 (only if ambiguous), 5, and
-6/7 exactly as above, so they can confirm the flow works end-to-end before
-using it for real.
+If the subagent reports a mismatch (console errors, failed calls, behavior
+that doesn't match the ticket), surface that to the user plainly — the
+commit already happened at Step 3, so say clearly that verification found
+an issue post-commit rather than implying nothing shipped.
