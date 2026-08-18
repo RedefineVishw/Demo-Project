@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useDispatch } from 'react-redux'
+import { login } from '../store/authSlice'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -20,7 +22,8 @@ function validate({ email, password }) {
   return errors
 }
 
-function SignupForm({ onSignup }) {
+function LoginForm() {
+  const dispatch = useDispatch()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState({})
@@ -36,58 +39,56 @@ function SignupForm({ onSignup }) {
     }
 
     setSubmitting(true)
-    // Stub account creation: no backend exists yet, so we persist locally
-    // and hand the user straight into the app.
-    const account = { email: email.trim(), createdAt: new Date().toISOString() }
-    window.localStorage.setItem('qa-pilot-account', JSON.stringify(account))
-    onSignup(account)
+    // Stub authentication: no backend exists yet, so any well-formed
+    // email/password pair is accepted and the user is logged in.
+    dispatch(login({ email: email.trim() }))
   }
 
   return (
-    <section className="signup-section" aria-labelledby="signup-heading">
-      <div className="signup-card">
-        <h2 id="signup-heading">Create your account</h2>
+    <section className="login-section" aria-labelledby="login-heading">
+      <div className="login-card">
+        <h2 id="login-heading">Log in to your account</h2>
         <form onSubmit={handleSubmit} noValidate>
           <div className="form-field">
-            <label htmlFor="signup-email">Email</label>
+            <label htmlFor="login-email">Email</label>
             <input
-              id="signup-email"
+              id="login-email"
               name="email"
               type="email"
               autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               aria-invalid={Boolean(errors.email)}
-              aria-describedby={errors.email ? 'signup-email-error' : undefined}
+              aria-describedby={errors.email ? 'login-email-error' : undefined}
             />
             {errors.email && (
-              <p className="field-error" id="signup-email-error">
+              <p className="field-error" id="login-email-error">
                 {errors.email}
               </p>
             )}
           </div>
 
           <div className="form-field">
-            <label htmlFor="signup-password">Password</label>
+            <label htmlFor="login-password">Password</label>
             <input
-              id="signup-password"
+              id="login-password"
               name="password"
               type="password"
-              autoComplete="new-password"
+              autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               aria-invalid={Boolean(errors.password)}
-              aria-describedby={errors.password ? 'signup-password-error' : undefined}
+              aria-describedby={errors.password ? 'login-password-error' : undefined}
             />
             {errors.password && (
-              <p className="field-error" id="signup-password-error">
+              <p className="field-error" id="login-password-error">
                 {errors.password}
               </p>
             )}
           </div>
 
           <button type="submit" className="form-submit" disabled={submitting}>
-            {submitting ? 'Creating account…' : 'Sign up'}
+            {submitting ? 'Logging in…' : 'Log in'}
           </button>
         </form>
       </div>
@@ -95,4 +96,4 @@ function SignupForm({ onSignup }) {
   )
 }
 
-export default SignupForm
+export default LoginForm

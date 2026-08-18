@@ -1,20 +1,20 @@
-import { useState } from 'react'
+import { useSelector } from 'react-redux'
 import Hero from './components/Hero'
-import SignupForm from './components/SignupForm'
+import LoginForm from './components/LoginForm'
 import Dashboard from './components/Dashboard'
 import './App.css'
 
 function App() {
-  const [account, setAccount] = useState(null)
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated)
 
-  if (account) {
-    return <Dashboard account={account} />
+  if (isAuthenticated) {
+    return <Dashboard />
   }
 
   return (
     <>
       <Hero />
-      <SignupForm onSignup={setAccount} />
+      <LoginForm />
     </>
   )
 }
