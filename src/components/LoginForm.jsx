@@ -22,7 +22,7 @@ function validate({ email, password }) {
   return errors
 }
 
-function LoginForm() {
+function LoginForm({ onSwitchToSignup }) {
   const dispatch = useDispatch()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -102,6 +102,12 @@ function LoginForm() {
             {submitting ? 'Logging in…' : 'Log in'}
           </button>
         </form>
+        <p className="auth-switch">
+          Don&apos;t have an account?{' '}
+          <button type="button" className="auth-switch-link" onClick={onSwitchToSignup}>
+            Sign up
+          </button>
+        </p>
       </div>
     </section>
   )

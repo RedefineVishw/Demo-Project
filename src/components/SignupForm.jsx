@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useDispatch } from 'react-redux'
+import { login } from '../store/authSlice'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -20,7 +22,8 @@ function validate({ email, password }) {
   return errors
 }
 
-function SignupForm({ onSignup }) {
+function SignupForm({ onSwitchToLogin }) {
+  const dispatch = useDispatch()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState({})
@@ -37,11 +40,10 @@ function SignupForm({ onSignup }) {
     }
 
     setSubmitting(true)
-    // Stub account creation: no backend exists yet, so we persist locally
-    // and hand the user straight into the app.
-    const account = { email: email.trim(), createdAt: new Date().toISOString() }
-    window.localStorage.setItem('qa-pilot-account', JSON.stringify(account))
-    onSignup(account)
+    // Stub account creation: no backend exists yet, so any well-formed
+    // email/password pair is accepted and the user is logged in, same as
+    // the login flow.
+    dispatch(login({ email: email.trim() }))
   }
 
   return (
@@ -101,6 +103,12 @@ function SignupForm({ onSignup }) {
             {submitting ? 'Creating account…' : 'Sign up'}
           </button>
         </form>
+        <p className="auth-switch">
+          Already have an account?{' '}
+          <button type="button" className="auth-switch-link" onClick={onSwitchToLogin}>
+            Log in
+          </button>
+        </p>
       </div>
     </section>
   )
