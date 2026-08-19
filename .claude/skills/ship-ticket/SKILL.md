@@ -98,11 +98,23 @@ belongs here:
    ticket (what it asked for) and what was actually implemented, plus a
    plain line at the bottom: "Verification artifact: generating…" — Step 4
    will edit this in afterward via `gh pr edit`, not block PR creation on
-   it. Don't fabricate a PR number or URL — if `gh pr create` fails (no
-   remote, no auth), say so plainly instead of inventing one.
-6. Tell the user the commit/push/PR is done and give them the PR link —
-   right here, immediately. Don't make them wait through Step 4 to hear
-   this. They're free to move on to their next ticket at this point.
+   it. Don't fabricate a PR number or URL — if `gh pr create` fails (missing
+   `gh` CLI, no remote, no auth), say so plainly and specifically (e.g.
+   "`gh` isn't installed in this environment" vs. "not authenticated") and
+   move on to step 6 anyway. **A failed PR does not cancel anything below
+   it or Step 4** — commit and push already succeeded independently, and
+   the video/tests/artifact in Step 4 have value on their own regardless of
+   whether a PR exists to attach them to.
+6. Tell the user what's actually true, plainly: commit + push succeeded
+   (always true at this point, or you wouldn't be here), and either the PR
+   link (success) or exactly why the PR wasn't created (failure) — don't
+   conflate the two into one vague "done." Then proceed to Step 4
+   regardless of which case this was; they're free to move on to their
+   next ticket at this point, they don't need to wait for it.
+
+**Do not skip Step 4 because something in this step failed.** Commit,
+push, PR, and packaging are four independent outcomes — report each one's
+real status rather than letting one failure silently cancel the rest.
 
 ## Step 4 — Packaging (runs in the background, doesn't block the user)
 
@@ -115,14 +127,18 @@ watching a spinner for something that isn't fast. Give it:
 
 - The ticket text (including acceptance criteria, if present).
 - What was implemented (short description + files changed).
-- The commit hash and the PR URL from Step 3.
+- The commit hash, and the PR URL from Step 3 **if one exists** — pass
+  `null`/omit it rather than blocking Step 4 on a PR that was never
+  created.
 - The local path to the video file Step 3 just recorded.
 
-When it completes (you'll get notified — don't poll for it), run
-`gh pr edit` to replace the "generating…" placeholder line with the real
-artifact link, then surface the subagent's verdict and copy-paste block to
-the user. If the user has already moved on to a new ticket by then, still
-report it plainly when it comes back rather than silently dropping it.
+When it completes (you'll get notified — don't poll for it): if a PR
+exists, run `gh pr edit` to replace the "generating…" placeholder line with
+the real artifact link; if it doesn't, just surface the artifact link
+directly to the user instead (there's no PR body to edit). Either way,
+report the subagent's verdict and copy-paste block to the user. If the user
+has already moved on to a new ticket by then, still report it plainly when
+it comes back rather than silently dropping it.
 
 The subagent should:
 
