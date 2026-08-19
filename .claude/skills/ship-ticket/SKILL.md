@@ -94,23 +94,27 @@ belongs here:
    used. Don't invent a conventional-commits format the repo doesn't use.
 3. Commit.
 4. Push the current branch.
-5. Open a PR via `gh pr create`, with a title and body drafted from the
-   ticket (what it asked for) and what was actually implemented, plus a
-   plain line at the bottom: "Verification artifact: generating…" — Step 4
-   will edit this in afterward via `gh pr edit`, not block PR creation on
-   it. Don't fabricate a PR number or URL — if `gh pr create` fails (missing
-   `gh` CLI, no remote, no auth), say so plainly and specifically (e.g.
-   "`gh` isn't installed in this environment" vs. "not authenticated") and
-   move on to step 6 anyway. **A failed PR does not cancel anything below
-   it or Step 4** — commit and push already succeeded independently, and
-   the video/tests/artifact in Step 4 have value on their own regardless of
-   whether a PR exists to attach them to.
-6. Tell the user what's actually true, plainly: commit + push succeeded
+5. Draft the PR title and body first, as plain text, regardless of whether
+   `gh` is even available — title + body drafted from the ticket (what it
+   asked for) and what was actually implemented, plus a placeholder line
+   at the bottom: "Verification artifact: generating…" (Step 4 fills this
+   in). This draft is the source of truth either way, not something you
+   only produce after a failure.
+6. Attempt `gh pr create` using that exact draft. Don't fabricate a PR
+   number or URL — if it fails (missing `gh` CLI, no remote, no auth), say
+   so plainly and specifically (e.g. "`gh` isn't installed in this
+   environment" vs. "not authenticated") and move on anyway. **A failed PR
+   does not cancel anything below it or Step 4** — commit and push already
+   succeeded independently, and the video/tests/artifact in Step 4 have
+   value on their own regardless of whether a PR exists to attach them to.
+7. Tell the user what's actually true, plainly: commit + push succeeded
    (always true at this point, or you wouldn't be here), and either the PR
-   link (success) or exactly why the PR wasn't created (failure) — don't
-   conflate the two into one vague "done." Then proceed to Step 4
-   regardless of which case this was; they're free to move on to their
-   next ticket at this point, they don't need to wait for it.
+   link (success), or — on failure — exactly why the PR wasn't created
+   *plus the full drafted title/body as a copy-paste block*, so they can
+   open the PR manually on GitHub's web UI without re-typing anything.
+   Don't conflate success and failure into one vague "done." Then proceed
+   to Step 4 regardless of which case this was; they're free to move on to
+   their next ticket at this point, they don't need to wait for it.
 
 **Do not skip Step 4 because something in this step failed.** Commit,
 push, PR, and packaging are four independent outcomes — report each one's
@@ -130,15 +134,22 @@ watching a spinner for something that isn't fast. Give it:
 - The commit hash, and the PR URL from Step 3 **if one exists** — pass
   `null`/omit it rather than blocking Step 4 on a PR that was never
   created.
+- The drafted PR title/body text from Step 3 (always exists, whether or
+  not `gh pr create` actually succeeded).
 - The local path to the video file Step 3 just recorded.
 
-When it completes (you'll get notified — don't poll for it): if a PR
-exists, run `gh pr edit` to replace the "generating…" placeholder line with
-the real artifact link; if it doesn't, just surface the artifact link
-directly to the user instead (there's no PR body to edit). Either way,
-report the subagent's verdict and copy-paste block to the user. If the user
-has already moved on to a new ticket by then, still report it plainly when
-it comes back rather than silently dropping it.
+When it completes (you'll get notified — don't poll for it):
+- **PR exists**: run `gh pr edit` to replace the "generating…" placeholder
+  line with the real artifact link.
+- **PR doesn't exist**: there's no PR body to edit, so instead give the
+  user the artifact link *and* the drafted PR title/body as a ready
+  copy-paste block — they can open the PR by hand and paste it straight
+  in, no retyping.
+
+Either way, report the subagent's verdict and the rest of its copy-paste
+block to the user. If the user has already moved on to a new ticket by
+then, still report it plainly when it comes back rather than silently
+dropping it.
 
 The subagent should:
 
