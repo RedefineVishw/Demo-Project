@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# MCP server config (machine-specific — Playwright video/headed settings)
+.mcp.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
