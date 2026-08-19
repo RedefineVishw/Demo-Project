@@ -25,6 +25,7 @@ function SignupForm({ onSignup }) {
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -69,16 +70,26 @@ function SignupForm({ onSignup }) {
 
           <div className="form-field">
             <label htmlFor="signup-password">Password</label>
-            <input
-              id="signup-password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              aria-invalid={Boolean(errors.password)}
-              aria-describedby={errors.password ? 'signup-password-error' : undefined}
-            />
+            <div className="password-input-wrap">
+              <input
+                id="signup-password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                aria-invalid={Boolean(errors.password)}
+                aria-describedby={errors.password ? 'signup-password-error' : undefined}
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
             {errors.password && (
               <p className="field-error" id="signup-password-error">
                 {errors.password}
