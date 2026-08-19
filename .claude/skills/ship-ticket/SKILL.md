@@ -1,17 +1,21 @@
 ---
 name: ship-ticket
-description: Trigger on the paste alone — no separate "implement this" instruction is required. Use whenever the user's message is or contains ticket/task-shaped text (a title plus a description of work, optionally Acceptance Criteria / Task Breakdown sections — the shape used by Wrike, Jira, Linear, GitHub issues, etc.), or when they explicitly say "ship this ticket" / "/ship-ticket". A bare paste of that shape, with zero other commentary, IS the instruction to run this skill. Drives the full flow from reading the ticket through implementation, an interactive human browser-review checkpoint with an auto-recorded video, commit + push + PR on approval, then an automated post-commit artifact with test results and the recording.
+description: Trigger on the paste alone — no separate "implement this" instruction is required. Use whenever the user's message is or contains ticket/task-shaped text (a title plus a description of work, optionally Acceptance Criteria / Task Breakdown sections — the shape used by Wrike, Jira, Linear, GitHub issues, etc.), or when they explicitly say "ship this ticket" / "/ship-ticket". A bare paste of that shape, with zero other commentary, IS the instruction to run this skill. Drives the full flow from reading the ticket through implementation, an interactive human browser-review checkpoint with screenshot evidence, commit + push on approval, then an automated post-commit artifact with test results and the screenshots.
 ---
 
 # Ship Ticket
 
 Four steps. Exactly one human checkpoint (Step 3 — now a live browser
 review instead of a text diff). Everything else — context gathering,
-implementation, opening/recording the browser, committing, pushing,
-opening the PR, and the final summary artifact — runs automatically once
-that checkpoint is cleared.
+implementation, opening the browser and capturing screenshots, committing,
+pushing, and the final summary artifact — runs automatically once that
+checkpoint is cleared.
 
-Never fabricate a video, a PR, a test result, or a "verified" claim without
+No PR is opened by this skill — commit and push only. Whatever happens
+after push (opening a PR, notifying a team, etc.) is left to the user or
+to whatever process already handles that for this repo.
+
+Never fabricate a screenshot, a test result, or a "verified" claim without
 real evidence behind it. If something can't be captured or run (no test
 suite in this repo, browser tools unavailable, etc.), say so plainly in the
 output instead of pretending it happened.
@@ -48,42 +52,42 @@ genuinely needs the person's judgment, at any point during the work:
 
 This replaces a text-only diff review with the person actually driving the
 change in a real browser and deciding from that, not from reading a diff.
-The stop signal comes from a button in the browser itself, not a chat
-reply.
+**Claude does not automate the interaction** — no scripted clicks, form
+fills, or navigation beyond opening the starting page. The human manually
+operates the real functionality themselves. The stop signal is the human
+closing the browser window, not a chat reply and not an injected button.
 
 1. Open the relevant page/flow in a real, visible browser via the
-   Playwright MCP tools (headed, not headless — see `.mcp.json`). Video
-   recording starts automatically the moment the browser opens; nothing
-   needs to be manually triggered.
-2. Inject a floating **"⏹ Stop & Review"** button into the page (via the
-   browser's JS-evaluation tool) — fixed position (e.g. bottom-right),
-   high z-index, styled distinctly from the app's own UI so it's obviously
-   not part of the product. This is a script, not a one-off DOM edit: it
-   also watches for the button disappearing (SPA route changes / React
-   re-renders can wipe injected nodes) and re-adds it automatically, so it
-   survives normal navigation around the flow.
-3. Tell the user plainly, once: the browser is open and recording — click
-   the on-page "Stop & Review" button when done, no need to reply here.
-   Then go quiet in chat and poll (via the wait/snapshot tools, on a short
-   interval) for the click signal. Do not ask the user anything else while
-   polling.
-4. On click, the button should flip to a visible "Stopping…" state so the
-   user gets confirmation the click registered, and write an invisible
-   signal marker into the page for Claude to detect.
-5. The moment the signal is detected: close the browser via Playwright MCP
-   (this finalizes the recorded video file locally), then immediately —
-   with no intervening chat message — ask with exactly two paths (use
+   Playwright MCP tools (headed, not headless — see `.mcp.json`). This one
+   navigation is the only automated action Claude takes in this step.
+   **There is no video recording** — `@playwright/mcp` has no
+   video/trace-capture flag (confirmed via its own `--help`; only
+   `--output-dir` and `--save-session`, which saves the MCP session log,
+   not a video) — so don't tell the user a recording is happening.
+2. Take an initial screenshot via the browser's screenshot tool right
+   after the page loads, then tell the user plainly, once: the browser is
+   open — go ahead and test the change yourself, close the browser window
+   when you're done, no need to reply here. Then go quiet in chat.
+3. Poll on a short interval using a lightweight, read-only browser tool
+   call (e.g. a snapshot or screenshot call) purely to detect state, not
+   to act on the page. Each successful poll may also save a screenshot, so
+   there's a sequence documenting the manual walkthrough without Claude
+   ever having driven it. Do not ask the user anything else while polling,
+   and do not click/type/navigate on their behalf during this loop.
+4. A poll call failing because the browser/page is no longer there (closed
+   by the user) is the stop signal. The moment that's detected, immediately
+   — with no intervening chat message — ask with exactly two paths (use
    AskUserQuestion):
-   - **Yes, ship it** — proceed immediately to commit/push/PR (below) and
+   - **Yes, ship it** — proceed immediately to commit/push (below) and
      then Step 4. No second confirmation.
    - **Needs changes** — capture what they want adjusted, apply it, and
-     repeat this step (reopen the browser, re-inject the button,
-     re-record) until they pick "yes" (or tell you to stop).
+     repeat this step (reopen the browser to the starting page, resume
+     polling) until they pick "yes" (or tell you to stop).
 
-If the JS-evaluation or wait/poll tools needed for the on-page button
-genuinely aren't available in a given session, say so plainly and fall back
-to asking for a plain "done" reply in chat instead of silently pretending
-the button exists.
+If the poll/snapshot tools needed to detect the browser closing genuinely
+aren't available in a given session, say so plainly and fall back to asking
+for a plain "done" reply in chat instead of silently pretending the
+detection is happening.
 
 On "yes" — this whole block should complete in seconds. Nothing slow
 belongs here:
@@ -94,36 +98,24 @@ belongs here:
    used. Don't invent a conventional-commits format the repo doesn't use.
 3. Commit.
 4. Push the current branch.
-5. Draft the PR title and body first, as plain text, regardless of whether
-   `gh` is even available — title + body drafted from the ticket (what it
-   asked for) and what was actually implemented, plus a placeholder line
-   at the bottom: "Verification artifact: generating…" (Step 4 fills this
-   in). This draft is the source of truth either way, not something you
-   only produce after a failure.
-6. Attempt `gh pr create` using that exact draft. Don't fabricate a PR
-   number or URL — if it fails (missing `gh` CLI, no remote, no auth), say
-   so plainly and specifically (e.g. "`gh` isn't installed in this
-   environment" vs. "not authenticated") and move on anyway. **A failed PR
-   does not cancel anything below it or Step 4** — commit and push already
-   succeeded independently, and the video/tests/artifact in Step 4 have
-   value on their own regardless of whether a PR exists to attach them to.
-7. Tell the user what's actually true, plainly: commit + push succeeded
-   (always true at this point, or you wouldn't be here), and either the PR
-   link (success), or — on failure — exactly why the PR wasn't created
-   *plus the full drafted title/body as a copy-paste block*, so they can
-   open the PR manually on GitHub's web UI without re-typing anything.
-   Don't conflate success and failure into one vague "done." Then proceed
-   to Step 4 regardless of which case this was; they're free to move on to
-   their next ticket at this point, they don't need to wait for it.
+5. Draft a PR title and description as plain text (from the ticket — what
+   it asked for — and what was actually implemented). This is a draft
+   only: no `gh`/`az` CLI calls, no host detection, no attempt to actually
+   open anything. It exists purely so Step 4 can hand it back as a
+   copy-paste block for whoever opens the PR by hand.
+6. Tell the user commit + push succeeded (or, if push failed — no remote,
+   no permission — say exactly why, plainly). No PR is opened here. Then
+   proceed to Step 4 regardless; they're free to move on to their next
+   ticket at this point, they don't need to wait for it.
 
-**Do not skip Step 4 because something in this step failed.** Commit,
-push, PR, and packaging are four independent outcomes — report each one's
-real status rather than letting one failure silently cancel the rest.
+**Do not skip Step 4 because push failed.** Commit/push and packaging are
+independent outcomes — a failed push doesn't mean there's nothing to
+report; Step 4's tests/screenshots/artifact still have value on their own.
 
 ## Step 4 — Packaging (runs in the background, doesn't block the user)
 
-The slow part — running tests, uploading the video, writing the report —
-is exactly the part that shouldn't hold anyone up. Launch the
+The slow part — running tests, uploading the screenshots, writing the
+report — is exactly the part that shouldn't hold anyone up. Launch the
 `verify-and-summarize` subagent via the Agent tool **in the background**
 (`run_in_background: true`) immediately after Step 3 finishes, so test
 output/file noise stay out of this conversation AND the user isn't stuck
@@ -131,25 +123,14 @@ watching a spinner for something that isn't fast. Give it:
 
 - The ticket text (including acceptance criteria, if present).
 - What was implemented (short description + files changed).
-- The commit hash, and the PR URL from Step 3 **if one exists** — pass
-  `null`/omit it rather than blocking Step 4 on a PR that was never
-  created.
-- The drafted PR title/body text from Step 3 (always exists, whether or
-  not `gh pr create` actually succeeded).
-- The local path to the video file Step 3 just recorded.
+- The commit hash.
+- The drafted PR title/description text from Step 3.
+- The local paths to the screenshot(s) Step 3 just captured.
 
-When it completes (you'll get notified — don't poll for it):
-- **PR exists**: run `gh pr edit` to replace the "generating…" placeholder
-  line with the real artifact link.
-- **PR doesn't exist**: there's no PR body to edit, so instead give the
-  user the artifact link *and* the drafted PR title/body as a ready
-  copy-paste block — they can open the PR by hand and paste it straight
-  in, no retyping.
-
-Either way, report the subagent's verdict and the rest of its copy-paste
-block to the user. If the user has already moved on to a new ticket by
-then, still report it plainly when it comes back rather than silently
-dropping it.
+When it completes (you'll get notified — don't poll for it), report the
+subagent's verdict, the artifact link, and its copy-paste block to the
+user. If the user has already moved on to a new ticket by then, still
+report it plainly when it comes back rather than silently dropping it.
 
 The subagent should:
 
@@ -161,27 +142,35 @@ The subagent should:
    if the error output actually supports it; otherwise just report the
    failure without guessing why. If there's no test suite, say so instead
    of skipping the section silently.
-2. Upload the recorded video file as an Artifact asset (`Artifact` tool,
-   `upload_asset` action) so it's a real, playable link — not a local file
-   path.
-3. Publish a single Artifact structured as:
+2. Upload every screenshot Step 3 captured as an Artifact asset
+   (`Artifact` tool, `upload_asset` action) so each is a real, embeddable
+   image link — not a local file path nobody else can open.
+3. Publish a single **HTML** Artifact (not Markdown — a copy-to-clipboard
+   button needs real JS, which Markdown artifacts can't run) structured as:
    - **What was done** — plain summary of the implementation.
    - **Test results** — pass/fail breakdown from step 1 above, failures
      called out honestly rather than buried.
-   - **Pull request** — the PR link from Step 3.
-   - **Recorded walkthrough** — the uploaded video, embedded and playable.
-   - **Screenshots** (optional) — a few key frames if useful alongside the
-     video.
+   - **PR title & description** — the drafted text from Step 3, as a
+     ready copy-paste block for whoever opens the PR by hand. Not a link
+     to anything — this skill never opens the PR itself.
+   - **Screenshots** — every uploaded screenshot from the walkthrough,
+     embedded in order so the reviewed flow is reconstructable from the
+     images alone. Each screenshot gets its own **Copy** button (SVG icon,
+     no emoji) beside it that copies that image to the clipboard via the
+     Clipboard API, so the recipient can paste it straight into Wrike/a PR
+     comment without saving the file first. Fall back to a visible "right
+     click the image to copy" hint if the Clipboard API call fails.
    - **For the manager / non-technical reader** — 2-4 plain-English
      sentences, no jargon.
 4. Return to this conversation only: pass/fail verdict, the artifact link,
    and a copy-paste-ready plain-text block mirroring the artifact (what
-   was done, test results, PR link, artifact link) so the user can paste
-   that straight into a Wrike comment — matching the style of "I've added
-   X, one test is failing because Y, here's the PR, here's the artifact."
+   was done, test results, the drafted PR title/description, artifact
+   link) so the user can paste the ticket summary into Wrike and the PR
+   text into GitHub/Azure DevOps/wherever, without retyping either —
+   matching the style of "I've added X, one test is failing because Y,
+   here's the PR text, here's the artifact."
 
 If the subagent finds a real failure the human's browser review didn't
 catch (e.g. an automated test that fails), surface that to the user
-plainly — the commit/push/PR already happened at Step 3, so say clearly
-that packaging found an issue post-commit rather than implying nothing
-shipped.
+plainly — the commit/push already happened at Step 3, so say clearly that
+packaging found an issue post-commit rather than implying nothing shipped.
