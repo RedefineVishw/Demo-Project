@@ -1,6 +1,6 @@
 ---
 name: ship-ticket
-description: Use when the user pastes a block of raw ticket/task description text (e.g. copied from Wrike — has a title and description of work to do) and asks to implement it, or when the user explicitly says "ship this ticket". Drives the full flow from reading the ticket through implementation, an interactive human browser-review checkpoint with an auto-recorded video, commit + push + PR on approval, then an automated post-commit artifact with test results and the recording.
+description: Trigger on the paste alone — no separate "implement this" instruction is required. Use whenever the user's message is or contains ticket/task-shaped text (a title plus a description of work, optionally Acceptance Criteria / Task Breakdown sections — the shape used by Wrike, Jira, Linear, GitHub issues, etc.), or when they explicitly say "ship this ticket" / "/ship-ticket". A bare paste of that shape, with zero other commentary, IS the instruction to run this skill. Drives the full flow from reading the ticket through implementation, an interactive human browser-review checkpoint with an auto-recorded video, commit + push + PR on approval, then an automated post-commit artifact with test results and the recording.
 ---
 
 # Ship Ticket
